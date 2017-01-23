@@ -1,0 +1,109 @@
+<!doctype html>
+<html>
+    <head>
+        <title>GameWisp Emotes WebSocket Example</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/msgpack-lite/0.1.26/msgpack.min.js"></script>
+        <script>
+            var events = {};
+
+            // fires after websocket connected and join_room event is emitted from the client to the server
+            events.initialize_room = function(data) {
+                console.log('initialize room data', data);
+            };
+
+            // fires whenever another user emits the join_room event
+            // NOTE: will not be fired if the user who is joining the room does not have any usable emotes
+            events.update_room = function(data) {
+                console.log('update room data', data);
+            };
+
+            // fires whenever another user leaves the room/closes their socket connection
+            events.leave_room = function(data) {
+                console.log('leave room data', data);
+            };
+
+            // fires whenever an emote is deleted by a channel or removed by a GameWisp admin for not following the rules
+            events.remove_emote = function(data) {
+                console.log('remove emote data', data);
+            };
+
+            // fires whenever an emote is added by a channel and approved by a GameWisp admin
+            events.add_emote = function(data) {
+                console.log('add emote data', data);
+            };
+
+            // fires whenever a user subscribes to a channel for the first time
+            events.new_subscriber = function(data) {
+                console.log('new subscriber data', data);
+            };
+
+            // fires whenever a user's subscription is cancelled and they have reached their end of access
+            events.cancel_subscriber = function(data) {
+                console.log('cancel subscriber data', data);
+            };
+
+            function SocketClientGW() {
+                this.socket = false;
+                this._connected = false;
+                this._connecting = false;
+                this._events = events;
+
+                this.connect();
+            }
+
+            SocketClientGW.prototype.connect = function() {
+                if (this._connected || this._connecting) return;
+                this._connecting = true;
+
+                var socketURL = 'wss://emotes.gamewisp.com/';
+
+                this.socket = new WebSocket(socketURL);
+                this.socket.binaryType = 'arraybuffer';
+
+                var _self = this;
+
+                this.socket.onopen = function() {
+                    _self._connected = true;
+                    _self.joinRoom();
+                };
+
+                this.socket.onerror = function() {
+                    // handle error
+                };
+
+                this.socket.onclose = function() {
+                    // handle close
+                };
+
+                this.socket.onmessage = function(message) {
+                    var evt = msgpack.decode(new Uint8Array(message.data));
+
+                    if (!evt || !(evt.name in _self._events)) return;
+
+                    // call the event handler with event data
+                    _self._events[evt.name](evt.data);
+                };
+            };
+
+            SocketClientGW.prototype.emit = function(evt, data) {
+                if (!this._connected || !this.socket) return;
+
+                this.socket.send(JSON.stringify({
+                    name: evt,
+                    data: data
+                }));
+            };
+
+            SocketClientGW.prototype.joinRoom = function() {
+                if (!this._connected) return;
+
+                this.emit('join_room', { room: 'test', user: 'testUser' });
+            };
+
+            var socket = new SocketClientGW();
+        </script>
+  </head>
+  <body>
+        <h1>Emotes Websocket Example</h1>
+  </body>
+</html>
